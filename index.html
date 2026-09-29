@@ -24,7 +24,7 @@ details[open] summary{margin-bottom:14px}
 .row{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--b)}
 .row:first-child{border-top:0}
 .av{width:38px;height:38px;border-radius:50%;background:#e8f0fe;color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
-.who{flex:1;min-width:0}.who b{display:block;overflow:hidden;text-overflow:ellipsis}.who span{font-size:.78rem;color:var(--s)}
+.who{flex:1;min-width:0}.who b{display:block;overflow:hidden;text-overflow:ellipsis}.who span{display:block;font-size:.78rem;color:var(--s)}.who code{background:#f1f3f4;padding:1px 6px;border-radius:5px;font-size:.78rem;color:var(--t)}.who a{color:var(--p);margin-left:4px;text-decoration:none;font-weight:600}
 .empty{color:var(--s);font-size:.9rem;padding:10px 0}
 input{width:100%;padding:10px 12px;border:1px solid #cfd4da;border-radius:8px;font-size:.92rem;outline:none;background:#fff}
 input:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(26,115,232,.18)}
@@ -54,7 +54,7 @@ pre{background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-size:.7
 <body>
 <div class="wrap">
   <header>
-    <div><h1>User Manager</h1><p>Review Finder logins</p></div>
+    <div><h1>User Manager</h1><p>Review Finder logins &middot; <span id="ver"></span></p></div>
     <div class="pill" id="pill">Not connected</div>
   </header>
 
@@ -72,7 +72,7 @@ pre{background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-size:.7
       <div class="pwr"><input id="np" type="text" placeholder="Password" autocomplete="off"><button class="btn" id="rand" type="button">Random</button></div>
       <button class="btn primary" id="add" type="button">Add user</button>
     </div>
-    <div class="help">Changes are saved to GitHub instantly. Usernames are not case-sensitive.</div>
+    <div class="help">Changes are saved to GitHub instantly. Passwords are remembered in this browser only, so you can copy them later.</div>
   </section>
 
   <details class="card" id="settings">
@@ -110,6 +110,11 @@ pre{background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-size:.7
 <script>
 const $=id=>document.getElementById(id);
 const K={t:'deployer_gh_token',r:'deployer_gh_repo',b:'deployer_gh_branch',p:'deployer_gh_path'};
+const VERSION='2.1.1',BUILD='29 Sep 2026';
+const DEFAULT_REPO='review-finder/dashboard';
+const PWK='deployer_known_pw';
+const pws=()=>{try{return JSON.parse(localStorage.getItem(PWK)||'{}')}catch(e){return{}}};
+const setPw=(u,p)=>{const m=pws();if(p==null)delete m[u];else m[u]=p;try{localStorage.setItem(PWK,JSON.stringify(m))}catch(e){}};
 let users=[],salt='place_finder_salt_2024',sha=null,busy=false;
 
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -136,11 +141,12 @@ function pill(t,k){$('pill').textContent=t;$('pill').className='pill '+(k||'')}
 function toast(t,k){const e=$('toast');e.textContent=t;e.className='toast '+(k||'');e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2600)}
 function note(html,k){const n=$('note');n.className='note on '+(k||'');n.innerHTML=html}
 function clearNote(){$('note').className='note'}
-async function copy(t){try{await navigator.clipboard.writeText(t);toast('Copied','ok')}catch(e){toast('Copy failed','bad')}}
+async function copy(t,m){try{await navigator.clipboard.writeText(t);toast(m||'Copied','ok')}catch(e){toast('Copy failed','bad')}}
 
 function render(){
   $('count').textContent=users.length?`(${users.length})`:'';
-  $('list').innerHTML=users.length?users.map(u=>`<div class="row"><div class="av">${esc(u.username[0].toUpperCase())}</div><div class="who"><b>${esc(u.username)}</b><span>${u.createdAt?'Added '+new Date(u.createdAt).toLocaleDateString():''}</span></div><button class="btn sm" data-pw="${esc(u.username)}">Change password</button><button class="btn sm danger" data-rm="${esc(u.username)}">Remove</button></div>`).join(''):'<div class="empty">No users yet. Add the first one below.</div>';
+  const m=pws();
+  $('list').innerHTML=users.length?users.map(u=>{const n=esc(u.username);return `<div class="row"><div class="av">${n[0].toUpperCase()}</div><div class="who"><b>${n}</b><span>${m[u.username]?`Password: <code>&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</code><a href="#" data-show="${n}">Show</a>`:'Password not saved on this device'}</span>${u.createdAt?`<span>Added ${new Date(u.createdAt).toLocaleDateString()}</span>`:''}</div><button class="btn sm" data-copy="${n}">Copy login</button><button class="btn sm" data-pw="${n}">Change password</button><button class="btn sm danger" data-rm="${n}">Remove</button></div>`}).join(''):'<div class="empty">No users yet. Add the first one below.</div>';
   const c=cfg();
   $('raw').value=c.repo?`https://raw.githubusercontent.com/${c.repo}/refs/heads/${c.branch}/${c.path}`:'';
   $('salt').value=salt;$('json').textContent=payload();
@@ -212,21 +218,24 @@ async function addUser(){
   if(p.length<4)return toast('Password must be at least 4 characters','bad');
   if(users.some(x=>x.username===u))return toast('That username already exists','bad');
   const ok=await change(async()=>{users.push({username:u,hash:await hash(u,p),createdAt:new Date().toISOString()})},`Add user ${u}`,'User added');
-  if(ok){created(u,p,'Added');$('nu').value='';$('np').value='';$('nu').focus()}
+  if(ok){setPw(u,p);created(u,p,'Added');$('nu').value='';$('np').value='';$('nu').focus()}
 }
 
 $('list').onclick=async e=>{
-  const pw=e.target.dataset.pw,rm=e.target.dataset.rm;
+  const pw=e.target.dataset.pw,rm=e.target.dataset.rm,sh=e.target.dataset.show,cu=e.target.dataset.copy;
+  if(sh){e.preventDefault();const c=e.target.parentNode.querySelector('code'),open=c.dataset.open==='1';
+    c.textContent=open?'\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022':(pws()[sh]||'');c.dataset.open=open?'0':'1';e.target.textContent=open?'Show':'Hide';return}
+  if(cu){const x=pws()[cu];x?copy('Username: '+cu+'\nPassword: '+x,'Login copied'):copy(cu,'Username copied - password not saved here. Use Change password to set one.');return}
   if(pw){
     const v=await ask('Change password',`New password for ${pw}`,{input:true,value:randPw(),ok:'Save'});
     if(v===null)return;if(v.length<4)return toast('Password must be at least 4 characters','bad');
     const ok=await change(async()=>{const x=users.find(z=>z.username===pw);x.hash=await hash(pw,v)},`Change password for ${pw}`,'Password changed');
-    if(ok)created(pw,v,'Updated');
+    if(ok){setPw(pw,v);created(pw,v,'Updated')}
   }
   if(rm){
     if(users.length<=1)return toast('Keep at least one user, or nobody can log in','bad');
     if(!await ask('Remove user',`Remove ${rm}? They will not be able to log in any more.`,{ok:'Remove',danger:true}))return;
-    change(async()=>{users=users.filter(z=>z.username!==rm)},`Remove user ${rm}`,'User removed');
+    change(async()=>{users=users.filter(z=>z.username!==rm)},`Remove user ${rm}`,'User removed').then(ok=>{if(ok)setPw(rm,null)});
   }
 };
 
@@ -239,9 +248,12 @@ $('copyraw').onclick=()=>$('raw').value&&copy($('raw').value);
 $('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([payload()],{type:'application/json'}));a.download='credentials.json';a.click()};
 
 $('gt').value=localStorage.getItem(K.t)||'';
-$('gr').value=localStorage.getItem(K.r)||'playtiearngarden-bit/GOOG-REVIEW';
+let sr=localStorage.getItem(K.r);
+if(!sr||/^playtiearngarden-bit\//i.test(sr)||/GOOG-REVIEW/i.test(sr)){sr=DEFAULT_REPO;try{localStorage.setItem(K.r,sr)}catch(e){}}
+$('gr').value=sr;
 $('gb').value=localStorage.getItem(K.b)||'main';
 $('gp').value=localStorage.getItem(K.p)||'credentials.json';
+$('ver').textContent='v'+VERSION+' \u00b7 '+BUILD;
 load();
 </script>
 </body>
