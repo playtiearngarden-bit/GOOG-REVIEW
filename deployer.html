@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>User Manager - Review Finder</title>
+<style>
+:root{--p:#1a73e8;--ph:#1557b0;--t:#202124;--s:#5f6368;--b:#e3e6ea;--bg:#f6f8fb;--ok:#137333;--bad:#d93025}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--t);padding:24px 16px 80px;line-height:1.45}
+.wrap{max-width:680px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:12px}
+h1{font-size:1.4rem}header p{font-size:.85rem;color:var(--s)}
+.pill{font-size:.78rem;font-weight:600;padding:5px 12px;border-radius:99px;background:#eceff1;color:var(--s);white-space:nowrap}
+.pill.ok{background:#e6f4ea;color:var(--ok)}.pill.bad{background:#fce8e6;color:var(--bad)}.pill.busy{background:#e8f0fe;color:var(--p)}
+.card{background:#fff;border:1px solid var(--b);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.card-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+h2{font-size:1.02rem}h2 small{color:var(--s);font-weight:500;margin-left:6px}
+summary{font-weight:600;cursor:pointer;font-size:1rem}
+details[open] summary{margin-bottom:14px}
+.note{display:none;padding:12px 14px;border-radius:10px;font-size:.88rem;margin-bottom:16px;background:#e8f0fe;color:#174ea6;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.note.on{display:flex}.note.ok{background:#e6f4ea;color:var(--ok)}.note.error{background:#fce8e6;color:var(--bad)}
+.note code{background:rgba(255,255,255,.7);padding:2px 6px;border-radius:5px;font-size:.85rem}
+.row{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--b)}
+.row:first-child{border-top:0}
+.av{width:38px;height:38px;border-radius:50%;background:#e8f0fe;color:var(--p);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+.who{flex:1;min-width:0}.who b{display:block;overflow:hidden;text-overflow:ellipsis}.who span{font-size:.78rem;color:var(--s)}
+.empty{color:var(--s);font-size:.9rem;padding:10px 0}
+input{width:100%;padding:10px 12px;border:1px solid #cfd4da;border-radius:8px;font-size:.92rem;outline:none;background:#fff}
+input:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(26,115,232,.18)}
+input[readonly]{background:#f6f8fb;color:var(--s)}
+label{display:block;font-size:.8rem;font-weight:600;margin:12px 0 5px}
+.add{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
+.pwr{display:flex;gap:6px}
+@media(max-width:620px){.add{grid-template-columns:1fr}.row{flex-wrap:wrap}.row .btn{flex:1}}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:9px 14px;border-radius:8px;border:1px solid #cfd4da;background:#fff;color:var(--t);font-size:.85rem;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#f1f3f4}.btn.sm{padding:7px 11px;font-size:.8rem}
+.btn.primary{background:var(--p);color:#fff;border-color:transparent}.btn.primary:hover{background:var(--ph)}
+.btn.danger{color:var(--bad)}.btn.danger:hover{background:#fce8e6}
+.btn.danger-fill{background:var(--bad);color:#fff;border-color:transparent}
+.btn:disabled{opacity:.5;cursor:default}
+pre{background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-size:.78rem;overflow:auto;max-height:260px}
+.help{font-size:.78rem;color:var(--s);margin-top:5px}
+.brow{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:16px;z-index:50}
+.modal.on{display:flex}
+.mb{background:#fff;border-radius:14px;padding:22px;width:100%;max-width:380px}
+.mb h3{margin-bottom:6px}.mb p{font-size:.88rem;color:var(--s);margin-bottom:12px}
+.mbtn{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#202124;color:#fff;padding:10px 18px;border-radius:10px;font-size:.88rem;display:none;z-index:60}
+.toast.bad{background:var(--bad)}.toast.ok{background:var(--ok)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>User Manager</h1><p>Review Finder logins</p></div>
+    <div class="pill" id="pill">Not connected</div>
+  </header>
+
+  <div class="note" id="note"></div>
+
+  <section class="card">
+    <div class="card-h"><h2>Users<small id="count"></small></h2><button class="btn sm" id="refresh">Refresh</button></div>
+    <div id="list"></div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-bottom:12px">Add a user</h2>
+    <div class="add">
+      <input id="nu" placeholder="Username" autocomplete="off" autocapitalize="none">
+      <div class="pwr"><input id="np" type="text" placeholder="Password" autocomplete="off"><button class="btn" id="rand" type="button">Random</button></div>
+      <button class="btn primary" id="add" type="button">Add user</button>
+    </div>
+    <div class="help">Changes are saved to GitHub instantly. Usernames are not case-sensitive.</div>
+  </section>
+
+  <details class="card" id="settings">
+    <summary>GitHub settings</summary>
+    <label for="gt">Personal access token</label>
+    <input id="gt" type="password" placeholder="github_pat_..." autocomplete="off">
+    <div class="help">Needs Contents: Read and write. Stored only in this browser.</div>
+    <label for="gr">Repository (owner/repo)</label>
+    <input id="gr" type="text">
+    <div class="add" style="grid-template-columns:110px 1fr;margin-top:12px">
+      <input id="gb" type="text" placeholder="main"><input id="gp" type="text" placeholder="credentials.json">
+    </div>
+    <div class="brow"><button class="btn primary" id="save">Save &amp; connect</button></div>
+  </details>
+
+  <details class="card">
+    <summary>Advanced</summary>
+    <label>Raw URL of credentials.json</label>
+    <div class="pwr"><input id="raw" readonly><button class="btn" id="copyraw">Copy</button></div>
+    <label>Salt (fixed - changing it would lock everyone out)</label>
+    <input id="salt" readonly>
+    <label>File contents</label>
+    <pre id="json"></pre>
+    <div class="brow"><button class="btn sm" id="dl">Download credentials.json</button></div>
+  </details>
+</div>
+
+<div class="modal" id="md"><div class="mb">
+  <h3 id="mt"></h3><p id="mp"></p>
+  <input id="mi" type="text">
+  <div class="mbtn"><button class="btn" id="mc">Cancel</button><button class="btn primary" id="mo">OK</button></div>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const K={t:'deployer_gh_token',r:'deployer_gh_repo',b:'deployer_gh_branch',p:'deployer_gh_path'};
+let users=[],salt='place_finder_salt_2024',sha=null,busy=false;
+
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cfg=()=>({token:$('gt').value.trim(),repo:$('gr').value.trim(),branch:$('gb').value.trim()||'main',path:$('gp').value.trim()||'credentials.json'});
+const api=c=>`https://api.github.com/repos/${c.repo}/contents/${c.path}`;
+const hdr=c=>({'Authorization':'Bearer '+c.token,'Accept':'application/vnd.github+json'});
+const q=c=>'?ref='+encodeURIComponent(c.branch)+'&_='+Date.now();
+
+// Same recipe the app uses to check a login: SHA-256 of  salt:username:password
+async function hash(u,p){
+  const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(`${salt}:${u}:${p}`));
+  return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function randPw(){
+  const ch='abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const a=new Uint32Array(12);crypto.getRandomValues(a);
+  return [...a].map(n=>ch[n%ch.length]).join('');
+}
+function payload(){
+  return JSON.stringify({version:'2.0',updatedAt:new Date().toISOString(),salt,users,description:'Users for Review Finder'},null,2);
+}
+
+function pill(t,k){$('pill').textContent=t;$('pill').className='pill '+(k||'')}
+function toast(t,k){const e=$('toast');e.textContent=t;e.className='toast '+(k||'');e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2600)}
+function note(html,k){const n=$('note');n.className='note on '+(k||'');n.innerHTML=html}
+function clearNote(){$('note').className='note'}
+async function copy(t){try{await navigator.clipboard.writeText(t);toast('Copied','ok')}catch(e){toast('Copy failed','bad')}}
+
+function render(){
+  $('count').textContent=users.length?`(${users.length})`:'';
+  $('list').innerHTML=users.length?users.map(u=>`<div class="row"><div class="av">${esc(u.username[0].toUpperCase())}</div><div class="who"><b>${esc(u.username)}</b><span>${u.createdAt?'Added '+new Date(u.createdAt).toLocaleDateString():''}</span></div><button class="btn sm" data-pw="${esc(u.username)}">Change password</button><button class="btn sm danger" data-rm="${esc(u.username)}">Remove</button></div>`).join(''):'<div class="empty">No users yet. Add the first one below.</div>';
+  const c=cfg();
+  $('raw').value=c.repo?`https://raw.githubusercontent.com/${c.repo}/refs/heads/${c.branch}/${c.path}`:'';
+  $('salt').value=salt;$('json').textContent=payload();
+}
+
+function ask(title,text,o={}){
+  return new Promise(res=>{
+    $('mt').textContent=title;$('mp').textContent=text;
+    const i=$('mi');i.style.display=o.input?'':'none';i.value=o.value||'';
+    $('mo').textContent=o.ok||'OK';$('mo').className='btn '+(o.danger?'danger-fill':'primary');
+    $('md').classList.add('on');if(o.input)setTimeout(()=>i.focus(),50);
+    const done=v=>{$('md').classList.remove('on');$('mo').onclick=$('mc').onclick=i.onkeydown=null;res(v)};
+    $('mo').onclick=()=>done(o.input?i.value:true);$('mc').onclick=()=>done(null);
+    i.onkeydown=e=>{if(e.key==='Enter')$('mo').click()};
+  });
+}
+
+async function load(){
+  const c=cfg();
+  if(!c.token||!c.repo){pill('Not connected');$('settings').open=true;note('Enter your GitHub token below to get started.');render();return}
+  pill('Loading...','busy');
+  try{
+    const r=await fetch(api(c)+q(c),{headers:hdr(c)});
+    if(r.status===404){users=[];sha=null;note('No credentials.json yet. Add your first user to create it.')}
+    else if(r.ok){
+      const j=await r.json();sha=j.sha;
+      const d=JSON.parse(decodeURIComponent(escape(atob(j.content.replace(/\n/g,'')))));
+      if(d.salt)salt=d.salt;
+      if(Array.isArray(d.users)){users=d.users;clearNote()}
+      else{users=[];note('The file on GitHub still uses the old single-password format. Add your first user to replace it.')}
+    }else{const e=await r.json().catch(()=>({}));throw new Error(e.message||r.status)}
+    pill('Connected','ok');
+  }catch(e){pill('Connection failed','bad');note('Could not connect: '+esc(e.message),'error')}
+  render();
+}
+
+async function publish(msg){
+  const c=cfg();
+  const put=s=>fetch(api(c),{method:'PUT',headers:{...hdr(c),'Content-Type':'application/json'},
+    body:JSON.stringify({message:msg,content:btoa(unescape(encodeURIComponent(payload()))),branch:c.branch,...(s?{sha:s}:{})})});
+  let r=await put(sha);
+  if(r.status===409||r.status===422){
+    const g=await fetch(api(c)+q(c),{headers:hdr(c)});
+    sha=g.ok?(await g.json()).sha:null;r=await put(sha);
+  }
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.message||('HTTP '+r.status));
+  sha=j.content.sha;
+}
+
+// Apply a change, save it to GitHub, and undo it locally if saving fails.
+async function change(fn,commitMsg,okMsg){
+  if(busy)return false;
+  const c=cfg();if(!c.token||!c.repo){toast('Add your GitHub token first','bad');$('settings').open=true;return false}
+  const prev=JSON.stringify(users);busy=true;pill('Saving...','busy');
+  try{await fn();await publish(commitMsg);pill('Connected','ok');render();toast(okMsg,'ok');return true}
+  catch(e){users=JSON.parse(prev);pill('Connection failed','bad');render();note('Not saved: '+esc(e.message),'error');return false}
+  finally{busy=false}
+}
+
+function created(u,p,verb){
+  note(`<span>${verb} <b>${esc(u)}</b> &middot; password <code>${esc(p)}</code></span><button class="btn sm" id="cc">Copy login</button>`,'ok');
+  $('cc').onclick=()=>copy(`Username: ${u}\nPassword: ${p}`);
+}
+
+async function addUser(){
+  const u=$('nu').value.trim().toLowerCase(),p=$('np').value;
+  if(!/^[a-z0-9._@-]{2,32}$/.test(u))return toast('Username: 2-32 letters, numbers, . _ - @','bad');
+  if(p.length<4)return toast('Password must be at least 4 characters','bad');
+  if(users.some(x=>x.username===u))return toast('That username already exists','bad');
+  const ok=await change(async()=>{users.push({username:u,hash:await hash(u,p),createdAt:new Date().toISOString()})},`Add user ${u}`,'User added');
+  if(ok){created(u,p,'Added');$('nu').value='';$('np').value='';$('nu').focus()}
+}
+
+$('list').onclick=async e=>{
+  const pw=e.target.dataset.pw,rm=e.target.dataset.rm;
+  if(pw){
+    const v=await ask('Change password',`New password for ${pw}`,{input:true,value:randPw(),ok:'Save'});
+    if(v===null)return;if(v.length<4)return toast('Password must be at least 4 characters','bad');
+    const ok=await change(async()=>{const x=users.find(z=>z.username===pw);x.hash=await hash(pw,v)},`Change password for ${pw}`,'Password changed');
+    if(ok)created(pw,v,'Updated');
+  }
+  if(rm){
+    if(users.length<=1)return toast('Keep at least one user, or nobody can log in','bad');
+    if(!await ask('Remove user',`Remove ${rm}? They will not be able to log in any more.`,{ok:'Remove',danger:true}))return;
+    change(async()=>{users=users.filter(z=>z.username!==rm)},`Remove user ${rm}`,'User removed');
+  }
+};
+
+$('add').onclick=addUser;
+$('nu').onkeydown=$('np').onkeydown=e=>{if(e.key==='Enter')addUser()};
+$('rand').onclick=()=>{$('np').value=randPw()};
+$('refresh').onclick=load;
+$('save').onclick=()=>{const c=cfg();localStorage.setItem(K.t,c.token);localStorage.setItem(K.r,c.repo);localStorage.setItem(K.b,c.branch);localStorage.setItem(K.p,c.path);toast('Settings saved','ok');load()};
+$('copyraw').onclick=()=>$('raw').value&&copy($('raw').value);
+$('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([payload()],{type:'application/json'}));a.download='credentials.json';a.click()};
+
+$('gt').value=localStorage.getItem(K.t)||'';
+$('gr').value=localStorage.getItem(K.r)||'playtiearngarden-bit/GOOG-REVIEW';
+$('gb').value=localStorage.getItem(K.b)||'main';
+$('gp').value=localStorage.getItem(K.p)||'credentials.json';
+load();
+</script>
+</body>
+</html>
